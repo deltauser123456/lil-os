@@ -1,0 +1,21 @@
+name: LilOS
+options:
+  bundleIdPrefix: com.deltauser
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  LilOS:
+    type: application
+    platform: iOS
+    sources:
+      - LilOSApp.swift
+      - DesktopView.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.deltauser.lilos
+        PRODUCT_NAME: Lil-OS
+        INFOPLIST_KEY_CFBundleDisplayName: Lil-OS
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: YES
