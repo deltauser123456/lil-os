@@ -10,6 +10,7 @@ targets:
     sources:
       - LilOSApp.swift
       - DesktopView.swift
+      - LockScreenView.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.deltauser.lilos
