@@ -30,6 +30,7 @@ private enum OSApp: String, CaseIterable, Identifiable {
 
 struct DesktopView: View {
     @State private var openApp: OSApp? = nil
+    @State private var isLocked = true
     @State private var showLauncher = false
     @State private var noteText = "Welcome to Lil-OS!\n\nYour own little desktop, right on your iPhone."
     @State private var darkMode = true
@@ -77,6 +78,15 @@ struct DesktopView: View {
                         .zIndex(3)
                         .transition(.scale(scale: 0.92).combined(with: .opacity))
                 }
+                if isLocked {
+                    LockScreenView(date: clock) {
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            isLocked = false
+                        }
+                    }
+                    .zIndex(10)
+                    .transition(.opacity)
+                }
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .clipped()
@@ -117,6 +127,17 @@ struct DesktopView: View {
             Spacer()
             Image(systemName: "wifi")
             Image(systemName: "battery.100percent")
+            Button {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isLocked = true
+                }
+            } label: {
+                Image(systemName: "lock.open")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Lock Lil-OS")
             Text(clock.formatted(date: .omitted, time: .shortened))
                 .font(.system(size: 12, weight: .semibold).monospacedDigit())
         }
