@@ -3,7 +3,8 @@
 Lil-OS is a desktop-style operating-system experience built as a native SwiftUI iPhone app. It does not replace iOS or install as a separate system firmware.
 
 ## Features
-- Desktop wallpaper and status/menu bar
+- Polished lock screen with live clock, date, swipe-up gesture, and unlock button
+- Desktop wallpaper and status/menu bar with a lock control
 - App launcher and dock
 - Desktop shortcuts
 - Window-style app panels with close controls and draggable title bars
