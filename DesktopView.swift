@@ -33,6 +33,11 @@ struct DesktopView: View {
     @State private var isLocked = true
     @State private var showLauncher = false
     @State private var noteText = "Welcome to Lil-OS!\n\nYour own little desktop, right on your iPhone."
+    @State private var noteFileURL: URL? = nil
+    @State private var fileURLs: [URL] = []
+    @State private var showNewFilePrompt = false
+    @State private var newFileName = "Untitled"
+    @State private var saveStatus = "Ready"
     @State private var darkMode = true
     @State private var wallpaper = 0
     @State private var calculatorDisplay = "0"
@@ -277,45 +282,210 @@ struct DesktopView: View {
         .position(x: screen.width / 2, y: screen.height * 0.48)
     }
 
-    private var filesContent: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            HStack {
-                Text("Locations").font(.system(size: 12, weight: .bold)).foregroundStyle(.white.opacity(0.5))
-                Spacer()
-                Image(systemName: "plus").foregroundStyle(.cyan)
-            }
-            fileRow("Desktop", "macwindow", "4 items")
-            fileRow("Documents", "doc.text.fill", "2 items")
-            fileRow("Downloads", "arrow.down.circle.fill", "0 items")
-            fileRow("Pictures", "photo.fill", "3 items")
-            Divider().overlay(.white.opacity(0.15))
-            Text("Recent").font(.system(size: 12, weight: .bold)).foregroundStyle(.white.opacity(0.5))
-            fileRow("Welcome.txt", "doc.plaintext", "Just now")
-            Spacer()
-        }
-        .padding(18)
+    private var filesDirectory: URL {
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documents.appendingPathComponent("LilOS Files", isDirectory: true)
     }
 
-    private func fileRow(_ title: String, _ icon: String, _ detail: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon).font(.system(size: 20)).foregroundStyle(.cyan).frame(width: 27)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 13, weight: .medium)).foregroundStyle(.white)
-                Text(detail).font(.system(size: 10)).foregroundStyle(.white.opacity(0.45))
+    private var filesContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("On My iPhone")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("\(fileURLs.count) text files")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                Spacer()
+                Button {
+                    newFileName = "Untitled"
+                    showNewFilePrompt = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 34, height: 34)
+                        .background(.cyan.opacity(0.75), in: RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Create text file")
             }
-            Spacer()
-            Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(.white.opacity(0.3))
+
+            if fileURLs.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 34))
+                        .foregroundStyle(.white.opacity(0.35))
+                    Text("No text files")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.75))
+                    Text("Tap + to create your first file.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.45))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(fileURLs, id: \.self) { url in
+                            Button {
+                                openTextFile(url)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "doc.text.fill")
+                                        .font(.system(size: 21))
+                                        .foregroundStyle(.cyan)
+                                        .frame(width: 30)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(url.lastPathComponent)
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                            .lineLimit(1)
+                                        Text("Text document")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.white.opacity(0.45))
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(.white.opacity(0.35))
+                                }
+                                .padding(12)
+                                .background(.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 12))
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    deleteTextFile(url)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
-        .padding(.vertical, 5)
+        .padding(18)
+        .onAppear(perform: loadTextFiles)
+        .alert("New text file", isPresented: $showNewFilePrompt) {
+            TextField("File name", text: $newFileName)
+            Button("Create", action: createTextFile)
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Your file will be saved inside Lil-OS.")
+        }
+    }
+
+    private func loadTextFiles() {
+        do {
+            try FileManager.default.createDirectory(at: filesDirectory, withIntermediateDirectories: true)
+            let urls = try FileManager.default.contentsOfDirectory(
+                at: filesDirectory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            )
+            let textFiles = urls.filter { $0.pathExtension.lowercased() == "txt" }
+                .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
+
+            if textFiles.isEmpty {
+                let welcomeURL = filesDirectory.appendingPathComponent("Welcome.txt")
+                try "Welcome to Lil-OS!\n\nYour own little desktop, right on your iPhone."
+                    .write(to: welcomeURL, atomically: true, encoding: .utf8)
+                fileURLs = [welcomeURL]
+            } else {
+                fileURLs = textFiles
+            }
+        } catch {
+            saveStatus = "Couldn't load files"
+            fileURLs = []
+        }
+    }
+
+    private func createTextFile() {
+        let requestedName = newFileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !requestedName.isEmpty else { return }
+
+        let fileName = URL(fileURLWithPath: requestedName).lastPathComponent
+        let baseName = fileName.lowercased().hasSuffix(".txt") ? String(fileName.dropLast(4)) : fileName
+        let safeBaseName = baseName.isEmpty ? "Untitled" : baseName
+        var destination = filesDirectory.appendingPathComponent("\(safeBaseName).txt")
+        var suffix = 2
+
+        while FileManager.default.fileExists(atPath: destination.path) {
+            destination = filesDirectory.appendingPathComponent("\(safeBaseName) \(suffix).txt")
+            suffix += 1
+        }
+
+        do {
+            try FileManager.default.createDirectory(at: filesDirectory, withIntermediateDirectories: true)
+            try "".write(to: destination, atomically: true, encoding: .utf8)
+            loadTextFiles()
+            openTextFile(destination)
+        } catch {
+            saveStatus = "Couldn't create file"
+        }
+    }
+
+    private func openTextFile(_ url: URL) {
+        do {
+            noteText = try String(contentsOf: url, encoding: .utf8)
+            noteFileURL = url
+            saveStatus = "Saved"
+            openApp = .notes
+        } catch {
+            saveStatus = "Couldn't open file"
+        }
+    }
+
+    private func deleteTextFile(_ url: URL) {
+        do {
+            try FileManager.default.removeItem(at: url)
+            if noteFileURL == url {
+                noteFileURL = nil
+                noteText = ""
+            }
+            loadTextFiles()
+        } catch {
+            saveStatus = "Couldn't delete file"
+        }
+    }
+
+    private func saveNote() {
+        do {
+            try FileManager.default.createDirectory(at: filesDirectory, withIntermediateDirectories: true)
+            let destination = noteFileURL ?? filesDirectory.appendingPathComponent("Welcome.txt")
+            try noteText.write(to: destination, atomically: true, encoding: .utf8)
+            noteFileURL = destination
+            saveStatus = "Saved"
+            loadTextFiles()
+        } catch {
+            saveStatus = "Save failed"
+        }
     }
 
     private var notesContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Welcome.txt").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.65))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(noteFileURL?.lastPathComponent ?? "Welcome.txt")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.8))
+                    Text(saveStatus)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(saveStatus == "Saved" ? .green : .white.opacity(0.45))
+                }
                 Spacer()
-                Image(systemName: "square.and.arrow.down").foregroundStyle(.cyan)
+                Button(action: saveNote) {
+                    Label("Save", systemImage: "square.and.arrow.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.cyan)
+                }
+                .buttonStyle(.plain)
             }
+
             TextEditor(text: $noteText)
                 .font(.system(size: 14, design: .monospaced))
                 .scrollContentBackground(.hidden)
@@ -324,6 +494,9 @@ struct DesktopView: View {
                 .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 9))
         }
         .padding(14)
+        .onChange(of: noteText) { _ in
+            saveStatus = "Unsaved changes"
+        }
     }
 
     private var calculatorContent: some View {
