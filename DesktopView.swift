@@ -45,6 +45,9 @@ struct DesktopView: View {
     @State private var calculatorOperation: String? = nil
     @State private var calculatorFresh = true
     @State private var windowOffset = CGSize.zero
+    @State private var windowDragOrigin = CGSize.zero
+    @State private var isMinimized = false
+    @State private var isMaximized = false
     @State private var clock = Date()
 
     private let wallpapers: [[Color]] = [
@@ -78,7 +81,7 @@ struct DesktopView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .zIndex(5)
                 }
-                if let app = openApp {
+                if let app = openApp, !isMinimized {
                     appWindow(app, screen: geo.size)
                         .zIndex(3)
                         .transition(.scale(scale: 0.92).combined(with: .opacity))
@@ -97,6 +100,8 @@ struct DesktopView: View {
             .clipped()
             .animation(.spring(response: 0.34, dampingFraction: 0.86), value: openApp)
             .animation(.spring(response: 0.3, dampingFraction: 0.85), value: showLauncher)
+            .animation(.spring(response: 0.32, dampingFraction: 0.86), value: isMinimized)
+            .animation(.spring(response: 0.32, dampingFraction: 0.86), value: isMaximized)
             .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { date in clock = date }
         }
         .ignoresSafeArea()
@@ -126,7 +131,7 @@ struct DesktopView: View {
             Image(systemName: "apple.terminal.fill")
                 .font(.system(size: 15, weight: .bold))
             Text("Lil-OS").font(.system(size: 14, weight: .bold))
-            Text(openApp?.rawValue ?? "Desktop")
+            Text(isMinimized ? "Desktop" : (openApp?.rawValue ?? "Desktop"))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(0.68))
             Spacer()
@@ -189,6 +194,13 @@ struct DesktopView: View {
                         .foregroundStyle(app.tint)
                         .frame(width: 43, height: 43)
                         .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 13))
+                        .overlay(alignment: .bottom) {
+                            Circle()
+                                .fill(.white)
+                                .frame(width: 4, height: 4)
+                                .offset(y: 5)
+                                .opacity(openApp == app ? 1 : 0)
+                        }
                 }
                 .buttonStyle(.plain)
             }
@@ -246,12 +258,56 @@ struct DesktopView: View {
     private func appWindow(_ app: OSApp, screen: CGSize) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Button { openApp = nil; windowOffset = .zero } label: {
-                    Image(systemName: "xmark").font(.system(size: 10, weight: .black)).foregroundStyle(.black)
-                        .frame(width: 12, height: 12).background(Color(red: 1, green: 0.36, blue: 0.34), in: Circle())
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        openApp = nil
+                        isMinimized = false
+                        isMaximized = false
+                        windowOffset = .zero
+                        windowDragOrigin = .zero
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 8, weight: .black))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(Color(red: 1, green: 0.36, blue: 0.34), in: Circle())
                 }
-                Circle().fill(Color.orange).frame(width: 12, height: 12)
-                Circle().fill(Color.green).frame(width: 12, height: 12)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close window")
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isMinimized = true
+                        isMaximized = false
+                        windowOffset = .zero
+                        windowDragOrigin = .zero
+                    }
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.system(size: 9, weight: .black))
+                        .foregroundStyle(.black.opacity(0.75))
+                        .frame(width: 22, height: 22)
+                        .background(Color(red: 1, green: 0.73, blue: 0.25), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Minimize window")
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isMaximized.toggle()
+                        windowOffset = .zero
+                        windowDragOrigin = .zero
+                    }
+                } label: {
+                    Image(systemName: isMaximized ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 8, weight: .black))
+                        .foregroundStyle(.black.opacity(0.75))
+                        .frame(width: 22, height: 22)
+                        .background(Color(red: 0.28, green: 0.82, blue: 0.48), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isMaximized ? "Restore window size" : "Maximize window")
                 Spacer()
                 Text(app.rawValue).font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
                 Spacer()
@@ -261,7 +317,20 @@ struct DesktopView: View {
             .frame(height: 43)
             .background(Color(red: 0.12, green: 0.14, blue: 0.20))
             .contentShape(Rectangle())
-            .gesture(DragGesture().onChanged { value in windowOffset = value.translation })
+            .gesture(
+                DragGesture(minimumDistance: 4)
+                    .onChanged { value in
+                        guard !isMaximized else { return }
+                        windowOffset = CGSize(
+                            width: windowDragOrigin.width + value.translation.width,
+                            height: windowDragOrigin.height + value.translation.height
+                        )
+                    }
+                    .onEnded { _ in
+                        guard !isMaximized else { return }
+                        windowDragOrigin = windowOffset
+                    }
+            )
             Group {
                 switch app {
                 case .files: filesContent
@@ -274,12 +343,15 @@ struct DesktopView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(red: 0.10, green: 0.12, blue: 0.17))
         }
-        .frame(width: min(screen.width - 28, 430), height: min(screen.height * 0.61, 520))
+        .frame(
+            width: isMaximized ? max(0, screen.width - 12) : min(screen.width - 28, 430),
+            height: isMaximized ? max(0, screen.height - 110) : min(screen.height * 0.61, 520)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 15))
         .overlay(RoundedRectangle(cornerRadius: 15).stroke(.white.opacity(0.18), lineWidth: 1))
         .shadow(color: .black.opacity(0.45), radius: 28, y: 15)
-        .offset(windowOffset)
-        .position(x: screen.width / 2, y: screen.height * 0.48)
+        .offset(isMaximized ? .zero : windowOffset)
+        .position(x: screen.width / 2, y: isMaximized ? screen.height / 2 : screen.height * 0.48)
     }
 
     private var filesDirectory: URL {
@@ -565,6 +637,9 @@ struct DesktopView: View {
     private func launch(_ app: OSApp) {
         showLauncher = false
         windowOffset = .zero
+        windowDragOrigin = .zero
+        isMinimized = false
+        isMaximized = false
         openApp = app
     }
 
