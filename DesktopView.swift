@@ -214,45 +214,16 @@ struct DesktopView: View {
     }
 
     private var launcher: some View {
-        VStack(spacing: 14) {
-            HStack {
-                Image(systemName: "magnifyingglass").foregroundStyle(.white.opacity(0.55))
-                Text("Search apps").foregroundStyle(.white.opacity(0.55))
-                Spacer()
-            }
-            .padding(12)
-            .background(.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(OSApp.allCases) { app in
-                    Button { launch(app); showLauncher = false } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: app.symbol).foregroundStyle(app.tint).font(.system(size: 21))
-                            Text(app.rawValue).foregroundStyle(.white).font(.system(size: 13, weight: .medium))
-                            Spacer()
-                        }
-                        .padding(12)
-                        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
+        LauncherPanel(
+            apps: OSApp.allCases,
+            onLaunch: { app in launch(app) },
+            onLock: {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showLauncher = false
+                    isLocked = true
                 }
             }
-            HStack {
-                Image(systemName: "person.crop.circle.fill")
-                Text("Lil-OS User")
-                Spacer()
-                Text("Power")
-                Image(systemName: "power")
-            }
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(.white.opacity(0.8))
-            .padding(.top, 4)
-        }
-        .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.2), lineWidth: 1))
-        .padding(.horizontal, 18)
-        .padding(.bottom, 94)
-        .frame(maxHeight: .infinity, alignment: .bottom)
+        )
     }
 
     private func appWindow(_ app: OSApp, screen: CGSize) -> some View {
@@ -678,3 +649,117 @@ struct DesktopView: View {
         else if calculatorDisplay.count < 12 { calculatorDisplay += key }
     }
 }
+
+private struct LauncherPanel: View {
+    let apps: [OSApp]
+    let onLaunch: (OSApp) -> Void
+    let onLock: () -> Void
+
+    @State private var searchText = ""
+
+    private var filteredApps: [OSApp] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return apps }
+        return apps.filter { $0.rawValue.localizedCaseInsensitiveContains(query) }
+    }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.white.opacity(0.55))
+
+                TextField("Search apps", text: $searchText)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+                    .submitLabel(.search)
+                    .accessibilityLabel("Search apps")
+
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.white.opacity(0.55))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
+                }
+            }
+            .padding(12)
+            .background(.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+
+            HStack {
+                Text("Applications")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.55))
+                Spacer()
+                Text("\(filteredApps.count)")
+                    .font(.system(size: 10, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+
+            if filteredApps.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "app.dashed")
+                        .font(.system(size: 27))
+                        .foregroundStyle(.white.opacity(0.35))
+                    Text("No apps found")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.8))
+                    Text("Try another search term.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.45))
+                }
+                .frame(maxWidth: .infinity, minHeight: 112)
+            } else {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    ForEach(filteredApps) { app in
+                        Button {
+                            onLaunch(app)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: app.symbol)
+                                    .foregroundStyle(app.tint)
+                                    .font(.system(size: 21))
+                                Text(app.rawValue)
+                                    .foregroundStyle(.white)
+                                    .font(.system(size: 13, weight: .medium))
+                                Spacer(minLength: 0)
+                            }
+                            .padding(12)
+                            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            HStack {
+                Image(systemName: "person.crop.circle.fill")
+                Text("Lil-OS User")
+                Spacer()
+                Button(action: onLock) {
+                    HStack(spacing: 6) {
+                        Text("Lock desktop")
+                        Image(systemName: "lock.fill")
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Lock Lil-OS desktop")
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.white.opacity(0.8))
+            .padding(.top, 4)
+        }
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.2), lineWidth: 1))
+        .padding(.horizontal, 18)
+        .padding(.bottom, 94)
+        .frame(maxHeight: .infinity, alignment: .bottom)
+    }
+}
+
