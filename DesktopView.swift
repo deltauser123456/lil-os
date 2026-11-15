@@ -177,8 +177,7 @@ struct DesktopView: View {
         .buttonStyle(.plain)
     }
 
-    private var dock: some View {
-        HStack(spacing: 13) {
+    private var dock: some View {        HStack(spacing: 13) {
             Button { withAnimation { showLauncher.toggle() } } label: {
                 Image(systemName: "square.grid.2x2.fill")
                     .font(.system(size: 22, weight: .semibold))
@@ -357,8 +356,7 @@ struct DesktopView: View {
             }
 
             if fileURLs.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "doc.text")
+                VStack(spacing: 10) {                    Image(systemName: "doc.text")
                         .font(.system(size: 34))
                         .foregroundStyle(.white.opacity(0.35))
                     Text("No text files")
@@ -537,8 +535,7 @@ struct DesktopView: View {
                 .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 9))
         }
         .padding(14)
-        .onChange(of: noteText) { _ in
-            saveStatus = "Unsaved changes"
+        .onChange(of: noteText) { _ in            saveStatus = "Unsaved changes"
         }
     }
 
@@ -615,38 +612,101 @@ struct DesktopView: View {
     }
 
     private func calculatorTap(_ key: String) {
-        if key == "AC" { calculatorDisplay = "0"; calculatorStored = nil; calculatorOperation = nil; calculatorFresh = true; return }
-        if key == "±" { if let value = Double(calculatorDisplay) { calculatorDisplay = String(-value) }; return }
-        if key == "%" { if let value = Double(calculatorDisplay) { calculatorDisplay = String(value / 100) }; return }
-        if ["÷", "×", "−", "+"].contains(key) {
-            calculatorStored = Double(calculatorDisplay) ?? 0
-            calculatorOperation = key
-            calculatorFresh = true
-            return
+        func formatted(_ value: Double) -> String {
+            guard value.isFinite else { return "Error" }
+            let normalized = value == 0 ? 0 : value
+            return normalized.formatted(.number.precision(.significantDigits(1...10)))
         }
-        if key == "=" {
-            guard let first = calculatorStored, let op = calculatorOperation, let second = Double(calculatorDisplay) else { return }
-            var result = second
-            switch op {
-            case "+": result = first + second
-            case "−": result = first - second
-            case "×": result = first * second
-            case "÷": result = second == 0 ? 0 : first / second
-            default: break
+
+        func calculate(_ first: Double, _ second: Double, operation: String) -> Double? {
+            switch operation {
+            case "+": return first + second
+            case "−": return first - second
+            case "×": return first * second
+            case "÷": return second == 0 ? nil : first / second
+            default: return nil
             }
-            calculatorDisplay = result.isFinite ? String(result) : "Error"
+        }
+
+        if key == "AC" {
+            calculatorDisplay = "0"
             calculatorStored = nil
             calculatorOperation = nil
             calculatorFresh = true
             return
         }
-        if key == "." {
-            if calculatorFresh { calculatorDisplay = "0."; calculatorFresh = false }
-            else if !calculatorDisplay.contains(".") { calculatorDisplay += "." }
+
+        if key == "±" {
+            guard let value = Double(calculatorDisplay) else { return }
+            calculatorDisplay = formatted(-value)
             return
         }
-        if calculatorFresh || calculatorDisplay == "0" { calculatorDisplay = key; calculatorFresh = false }
-        else if calculatorDisplay.count < 12 { calculatorDisplay += key }
+
+        if key == "%" {
+            guard let value = Double(calculatorDisplay) else { return }
+            calculatorDisplay = formatted(value / 100)
+            return
+        }
+
+        if ["÷", "×", "−", "+"].contains(key) {
+            if !calculatorFresh,
+               let first = calculatorStored,
+               let pendingOperation = calculatorOperation,
+               let second = Double(calculatorDisplay) {
+                guard let result = calculate(first, second, operation: pendingOperation) else {
+                    calculatorDisplay = "Error"
+                    calculatorStored = nil
+                    calculatorOperation = nil
+                    calculatorFresh = true
+                    return
+                }
+                calculatorDisplay = formatted(result)
+                calculatorStored = result
+            } else {
+                calculatorStored = Double(calculatorDisplay) ?? 0
+            }
+
+            calculatorOperation = key
+            calculatorFresh = true
+            return
+        }
+
+        if key == "=" {
+            guard let first = calculatorStored,
+                  let operation = calculatorOperation,
+                  let second = Double(calculatorDisplay) else { return }
+
+            guard let result = calculate(first, second, operation: operation) else {
+                calculatorDisplay = "Error"
+                calculatorStored = nil
+                calculatorOperation = nil
+                calculatorFresh = true
+                return
+            }
+
+            calculatorDisplay = formatted(result)
+            calculatorStored = nil
+            calculatorOperation = nil
+            calculatorFresh = true
+            return
+        }
+
+        if key == "." {
+            if calculatorFresh || calculatorDisplay == "Error" {
+                calculatorDisplay = "0."
+                calculatorFresh = false
+            } else if !calculatorDisplay.contains(".") {
+                calculatorDisplay += "."
+            }
+            return
+        }
+
+        if calculatorFresh || calculatorDisplay == "0" || calculatorDisplay == "Error" {
+            calculatorDisplay = key
+            calculatorFresh = false
+        } else if calculatorDisplay.count < 12 {
+            calculatorDisplay += key
+        }
     }
 }
 
@@ -717,8 +777,7 @@ private struct LauncherPanel: View {
             } else {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     ForEach(filteredApps) { app in
-                        Button {
-                            onLaunch(app)
+                        Button {                            onLaunch(app)
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: app.symbol)
@@ -762,4 +821,3 @@ private struct LauncherPanel: View {
         .frame(maxHeight: .infinity, alignment: .bottom)
     }
 }
-
