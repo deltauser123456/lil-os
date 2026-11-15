@@ -177,7 +177,8 @@ struct DesktopView: View {
         .buttonStyle(.plain)
     }
 
-    private var dock: some View {        HStack(spacing: 13) {
+    private var dock: some View {
+        HStack(spacing: 13) {
             Button { withAnimation { showLauncher.toggle() } } label: {
                 Image(systemName: "square.grid.2x2.fill")
                     .font(.system(size: 22, weight: .semibold))
@@ -356,7 +357,8 @@ struct DesktopView: View {
             }
 
             if fileURLs.isEmpty {
-                VStack(spacing: 10) {                    Image(systemName: "doc.text")
+                VStack(spacing: 10) {
+                    Image(systemName: "doc.text")
                         .font(.system(size: 34))
                         .foregroundStyle(.white.opacity(0.35))
                     Text("No text files")
@@ -535,7 +537,8 @@ struct DesktopView: View {
                 .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 9))
         }
         .padding(14)
-        .onChange(of: noteText) { _ in            saveStatus = "Unsaved changes"
+        .onChange(of: noteText) { _ in
+            saveStatus = "Unsaved changes"
         }
     }
 
@@ -777,7 +780,8 @@ private struct LauncherPanel: View {
             } else {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     ForEach(filteredApps) { app in
-                        Button {                            onLaunch(app)
+                        Button {
+                            onLaunch(app)
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: app.symbol)
