@@ -537,9 +537,13 @@ struct DesktopView: View {
                 .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 9))
         }
         .padding(14)
-        .onChange(of: noteText) { _ in
-            saveStatus = "Unsaved changes"
+        .task(id: noteText) {
+            saveStatus = "Saving…"
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled else { return }
+            saveNote()
         }
+        .onDisappear(perform: saveNote)
     }
 
     private var calculatorContent: some View {
