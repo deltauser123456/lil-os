@@ -4,6 +4,7 @@ private enum OSApp: String, CaseIterable, Identifiable {
     case files = "Files"
     case notes = "Notepad"
     case calculator = "Calculator"
+    case calendar = "Calendar"
     case settings = "Settings"
     case about = "About Lil-OS"
 
@@ -13,6 +14,7 @@ private enum OSApp: String, CaseIterable, Identifiable {
         case .files: return "folder.fill"
         case .notes: return "note.text"
         case .calculator: return "calculator.fill"
+        case .calendar: return "calendar"
         case .settings: return "gearshape.fill"
         case .about: return "desktopcomputer"
         }
@@ -22,10 +24,18 @@ private enum OSApp: String, CaseIterable, Identifiable {
         case .files: return .cyan
         case .notes: return .yellow
         case .calculator: return .orange
+        case .calendar: return .pink
         case .settings: return .gray
         case .about: return .purple
         }
     }
+}
+
+
+private struct LilOSCalendarEvent: Identifiable, Codable {
+    var id = UUID()
+    var title: String
+    var date: Date
 }
 
 struct DesktopView: View {
@@ -49,6 +59,11 @@ struct DesktopView: View {
     @State private var isMinimized = false
     @State private var isMaximized = false
     @State private var clock = Date()
+    @State private var selectedCalendarDate = Calendar.current.startOfDay(for: Date())
+    @State private var visibleCalendarMonth = Calendar.current.startOfDay(for: Date())
+    @State private var calendarEvents: [LilOSCalendarEvent] = []
+    @State private var showCalendarEventPrompt = false
+    @State private var calendarEventTitle = ""
 
     private let wallpapers: [[Color]] = [
         [Color(red: 0.03, green: 0.08, blue: 0.22), Color(red: 0.10, green: 0.32, blue: 0.55), Color(red: 0.34, green: 0.12, blue: 0.48)],
@@ -67,6 +82,7 @@ struct DesktopView: View {
                             desktopIcon(.files)
                             desktopIcon(.notes)
                             desktopIcon(.calculator)
+                            desktopIcon(.calendar)
                             desktopIcon(.settings)
                         }
                         Spacer(minLength: 0)
@@ -307,6 +323,7 @@ struct DesktopView: View {
                 case .files: filesContent
                 case .notes: notesContent
                 case .calculator: calculatorContent
+                case .calendar: calendarContent
                 case .settings: settingsContent
                 case .about: aboutContent
                 }
@@ -572,6 +589,227 @@ struct DesktopView: View {
             Spacer(minLength: 2)
         }
         .padding(14)
+    }
+
+    private var selectedDayEvents: [LilOSCalendarEvent] {
+        calendarEvents
+            .filter { Calendar.current.isDate($0.date, inSameDayAs: selectedCalendarDate) }
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+
+    private var calendarContent: some View {
+        let calendar = Calendar.current
+        let monthStart = calendar.dateInterval(of: .month, for: visibleCalendarMonth)?.start ?? visibleCalendarMonth
+        let dayRange = calendar.range(of: .day, in: .month, for: monthStart) ?? 1..<2
+        let leadingSpaces = (calendar.component(.weekday, from: monthStart) - calendar.firstWeekday + 7) % 7
+        let weekdaySymbols = (0..<7).map {
+            calendar.veryShortWeekdaySymbols[(calendar.firstWeekday - 1 + $0) % 7]
+        }
+
+        return VStack(spacing: 11) {
+            HStack(spacing: 12) {
+                Button {
+                    changeCalendarMonth(by: -1)
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(.white.opacity(0.08), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Previous month")
+
+                Spacer()
+                Text(visibleCalendarMonth.formatted(.dateTime.month(.wide).year()))
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.white)
+                Spacer()
+
+                Button {
+                    let today = Calendar.current.startOfDay(for: Date())
+                    visibleCalendarMonth = today
+                    selectedCalendarDate = today
+                } label: {
+                    Text("Today")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.cyan)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    changeCalendarMonth(by: 1)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(.white.opacity(0.08), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Next month")
+            }
+
+            HStack(spacing: 3) {
+                ForEach(weekdaySymbols.indices, id: \.self) { index in
+                    Text(weekdaySymbols[index])
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.45))
+                        .frame(maxWidth: .infinity)
+                }
+            }
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: 7), spacing: 5) {
+                ForEach(0..<leadingSpaces, id: \.self) { _ in
+                    Color.clear.frame(height: 35)
+                }
+
+                ForEach(Array(dayRange), id: \.self) { day in
+                    let date = calendar.date(byAdding: .day, value: day - 1, to: monthStart) ?? monthStart
+                    let isSelected = calendar.isDate(date, inSameDayAs: selectedCalendarDate)
+                    let hasEvent = calendarEvents.contains {
+                        calendar.isDate($0.date, inSameDayAs: date)
+                    }
+
+                    Button {
+                        selectedCalendarDate = date
+                    } label: {
+                        VStack(spacing: 2) {
+                            Text("\(day)")
+                                .font(.system(size: 12, weight: isSelected ? .bold : .medium))
+                                .foregroundStyle(isSelected ? Color.black : .white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 29)
+                                .background(
+                                    isSelected ? Color.cyan : (calendar.isDateInToday(date) ? Color.cyan.opacity(0.2) : Color.clear),
+                                    in: Circle()
+                                )
+                            Circle()
+                                .fill(hasEvent ? Color.cyan : Color.clear)
+                                .frame(width: 4, height: 4)
+                        }
+                        .frame(height: 35)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(date.formatted(date: .complete, time: .omitted))
+                }
+            }
+
+            Divider().overlay(.white.opacity(0.12))
+
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(selectedCalendarDate.formatted(date: .complete, time: .omitted))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Text("\(selectedDayEvents.count) events")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.white.opacity(0.45))
+                }
+                Spacer()
+                Button {
+                    calendarEventTitle = ""
+                    showCalendarEventPrompt = true
+                } label: {
+                    Label("Add event", systemImage: "plus")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.cyan)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if selectedDayEvents.isEmpty {
+                VStack(spacing: 5) {
+                    Image(systemName: "calendar.badge.checkmark")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.white.opacity(0.3))
+                    Text("Nothing planned")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.55))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 7) {
+                        ForEach(selectedDayEvents) { event in
+                            HStack(spacing: 9) {
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(.cyan)
+                                    .frame(width: 3, height: 25)
+                                Text(event.title)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                            }
+                            .padding(9)
+                            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 9))
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    deleteCalendarEvent(event)
+                                } label: {
+                                    Label("Delete event", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .onAppear(perform: loadCalendarEvents)
+        .alert("New event", isPresented: $showCalendarEventPrompt) {
+            TextField("Event name", text: $calendarEventTitle)
+            Button("Add", action: addCalendarEvent)
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This event will be saved on this device.")
+        }
+    }
+
+    private func changeCalendarMonth(by offset: Int) {
+        guard let newMonth = Calendar.current.date(
+            byAdding: .month,
+            value: offset,
+            to: visibleCalendarMonth
+        ) else { return }
+
+        visibleCalendarMonth = newMonth
+        selectedCalendarDate = newMonth
+    }
+
+    private func loadCalendarEvents() {
+        guard let data = UserDefaults.standard.data(forKey: "LilOS.Calendar.Events") else {
+            calendarEvents = []
+            return
+        }
+
+        do {
+            calendarEvents = try JSONDecoder().decode([LilOSCalendarEvent].self, from: data)
+        } catch {
+            calendarEvents = []
+        }
+    }
+
+    private func persistCalendarEvents() {
+        guard let data = try? JSONEncoder().encode(calendarEvents) else { return }
+        UserDefaults.standard.set(data, forKey: "LilOS.Calendar.Events")
+    }
+
+    private func addCalendarEvent() {
+        let title = calendarEventTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+
+        let date = Calendar.current.startOfDay(for: selectedCalendarDate)
+        calendarEvents.append(LilOSCalendarEvent(title: title, date: date))
+        persistCalendarEvents()
+        calendarEventTitle = ""
+    }
+
+    private func deleteCalendarEvent(_ event: LilOSCalendarEvent) {
+        calendarEvents.removeAll { $0.id == event.id }
+        persistCalendarEvents()
     }
 
     private var settingsContent: some View {
