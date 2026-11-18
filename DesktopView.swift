@@ -5,6 +5,7 @@ private enum OSApp: String, CaseIterable, Identifiable {
     case notes = "Notepad"
     case calculator = "Calculator"
     case calendar = "Calendar"
+    case clock = "Clock"
     case settings = "Settings"
     case about = "About Lil-OS"
 
@@ -15,6 +16,7 @@ private enum OSApp: String, CaseIterable, Identifiable {
         case .notes: return "note.text"
         case .calculator: return "calculator.fill"
         case .calendar: return "calendar"
+        case .clock: return "clock.fill"
         case .settings: return "gearshape.fill"
         case .about: return "desktopcomputer"
         }
@@ -25,6 +27,7 @@ private enum OSApp: String, CaseIterable, Identifiable {
         case .notes: return .yellow
         case .calculator: return .orange
         case .calendar: return .pink
+        case .clock: return .mint
         case .settings: return .gray
         case .about: return .purple
         }
@@ -59,6 +62,8 @@ struct DesktopView: View {
     @State private var isMinimized = false
     @State private var isMaximized = false
     @State private var clock = Date()
+    @State private var stopwatchStartedAt: Date? = nil
+    @State private var stopwatchElapsed: TimeInterval = 0
     @State private var selectedCalendarDate = Calendar.current.startOfDay(for: Date())
     @State private var visibleCalendarMonth = Calendar.current.startOfDay(for: Date())
     @State private var calendarEvents: [LilOSCalendarEvent] = []
@@ -83,6 +88,7 @@ struct DesktopView: View {
                             desktopIcon(.notes)
                             desktopIcon(.calculator)
                             desktopIcon(.calendar)
+                            desktopIcon(.clock)
                             desktopIcon(.settings)
                         }
                         Spacer(minLength: 0)
@@ -203,7 +209,7 @@ struct DesktopView: View {
                     .background(.white.opacity(0.17), in: RoundedRectangle(cornerRadius: 14))
             }
             Rectangle().fill(.white.opacity(0.2)).frame(width: 1, height: 32)
-            ForEach([OSApp.files, .notes, .calculator, .settings], id: \.self) { app in
+            ForEach([OSApp.files, .notes, .calculator, .clock, .settings], id: \.self) { app in
                 Button { launch(app) } label: {
                     Image(systemName: app.symbol)
                         .font(.system(size: 21, weight: .semibold))
@@ -324,6 +330,7 @@ struct DesktopView: View {
                 case .notes: notesContent
                 case .calculator: calculatorContent
                 case .calendar: calendarContent
+                case .clock: clockContent
                 case .settings: settingsContent
                 case .about: aboutContent
                 }
@@ -589,6 +596,135 @@ struct DesktopView: View {
             Spacer(minLength: 2)
         }
         .padding(14)
+    }
+
+    private var currentStopwatchElapsed: TimeInterval {
+        stopwatchElapsed + (stopwatchStartedAt.map { max(0, clock.timeIntervalSince($0)) } ?? 0)
+    }
+
+    private var clockContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("STOPWATCH", systemImage: "stopwatch.fill")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.65))
+                Spacer()
+                Circle()
+                    .fill(stopwatchStartedAt == nil ? Color.white.opacity(0.25) : Color.green)
+                    .frame(width: 7, height: 7)
+                Text(stopwatchStartedAt == nil ? "PAUSED" : "RUNNING")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(.white.opacity(0.55))
+            }
+
+            VStack(spacing: 14) {
+                Text(stopwatchString(currentStopwatchElapsed))
+                    .font(.system(size: 43, weight: .light, design: .rounded).monospacedDigit())
+                    .foregroundStyle(.white)
+                    .minimumScaleFactor(0.65)
+                    .lineLimit(1)
+
+                HStack(spacing: 12) {
+                    Button(action: resetStopwatch) {
+                        Label("Reset", systemImage: "arrow.counterclockwise")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 42)
+                            .background(.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 11))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: toggleStopwatch) {
+                        Label(stopwatchStartedAt == nil ? "Start" : "Pause",
+                              systemImage: stopwatchStartedAt == nil ? "play.fill" : "pause.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.black.opacity(0.85))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 42)
+                            .background(Color.mint, in: RoundedRectangle(cornerRadius: 11))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity)
+            .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 15))
+
+            Divider().overlay(.white.opacity(0.12))
+
+            HStack {
+                Text("WORLD CLOCKS")
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(0.8)
+                    .foregroundStyle(.white.opacity(0.65))
+                Spacer()
+                Text("LIVE")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(.green)
+            }
+
+            VStack(spacing: 0) {
+                worldClockRow("Local time", timeZoneID: TimeZone.current.identifier)
+                worldClockRow("New York", timeZoneID: "America/New_York")
+                worldClockRow("London", timeZoneID: "Europe/London")
+                worldClockRow("Tokyo", timeZoneID: "Asia/Tokyo")
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+    }
+
+    private func worldClockRow(_ city: String, timeZoneID: String) -> some View {
+        let zone = TimeZone(identifier: timeZoneID) ?? .current
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        formatter.timeZone = zone
+
+        return HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(city)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text(zone.abbreviation(for: clock) ?? zone.identifier)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.42))
+            }
+            Spacer()
+            Text(formatter.string(from: clock))
+                .font(.system(size: 16, weight: .medium, design: .rounded).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.9))
+        }
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(.white.opacity(0.07)).frame(height: 0.5)
+        }
+    }
+
+    private func stopwatchString(_ interval: TimeInterval) -> String {
+        let totalSeconds = max(0, Int(interval))
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+
+    private func toggleStopwatch() {
+        if let startedAt = stopwatchStartedAt {
+            stopwatchElapsed += max(0, clock.timeIntervalSince(startedAt))
+            stopwatchStartedAt = nil
+        } else {
+            stopwatchStartedAt = clock
+        }
+    }
+
+    private func resetStopwatch() {
+        stopwatchStartedAt = nil
+        stopwatchElapsed = 0
     }
 
     private var selectedDayEvents: [LilOSCalendarEvent] {
