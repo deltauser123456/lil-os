@@ -8,8 +8,8 @@ Lil-OS is a desktop-style operating-system experience built as a native SwiftUI 
 - App launcher and dock
 - Desktop shortcuts
 - Window-style app panels with close controls and draggable title bars
-- Files, Notepad, Calculator, Calendar, Clock, Settings, and About apps
-- Editable notes, working basic calculator, a stopwatch, world clocks, and selectable wallpapers
+- Files, Notepad, Calculator, Calendar, Clock, Paint Studio, Settings, and About apps
+- Editable notes, working basic calculator, a stopwatch, world clocks, a drawing canvas with local autosave, and selectable wallpapers
 
 ## Build
 This repository uses [XcodeGen](https://github.com/yonaskolb/XcodeGen).
