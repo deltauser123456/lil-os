@@ -98,7 +98,7 @@ struct PaintView: View {
                         let visibleStrokes = strokes + (activeStroke.map { [$0] } ?? [])
                         for stroke in visibleStrokes {
                             let points = stroke.points.map {
-                                CGPoint(x: $0.x * size.width, y: $0.y * size.height)
+                                CGPoint(x: CGFloat($0.x) * size.width, y: CGFloat($0.y) * size.height)
                             }
                             guard let firstPoint = points.first else { continue }
 
