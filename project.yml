@@ -10,6 +10,7 @@ targets:
     sources:
       - LilOSApp.swift
       - DesktopView.swift
+      - PaintView.swift
       - LockScreenView.swift
     settings:
       base:
