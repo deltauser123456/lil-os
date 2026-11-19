@@ -6,6 +6,7 @@ private enum OSApp: String, CaseIterable, Identifiable {
     case calculator = "Calculator"
     case calendar = "Calendar"
     case clock = "Clock"
+    case paint = "Paint"
     case settings = "Settings"
     case about = "About Lil-OS"
 
@@ -17,6 +18,7 @@ private enum OSApp: String, CaseIterable, Identifiable {
         case .calculator: return "calculator.fill"
         case .calendar: return "calendar"
         case .clock: return "clock.fill"
+        case .paint: return "paintpalette.fill"
         case .settings: return "gearshape.fill"
         case .about: return "desktopcomputer"
         }
@@ -28,6 +30,7 @@ private enum OSApp: String, CaseIterable, Identifiable {
         case .calculator: return .orange
         case .calendar: return .pink
         case .clock: return .mint
+        case .paint: return .pink
         case .settings: return .gray
         case .about: return .purple
         }
@@ -89,6 +92,7 @@ struct DesktopView: View {
                             desktopIcon(.calculator)
                             desktopIcon(.calendar)
                             desktopIcon(.clock)
+                            desktopIcon(.paint)
                             desktopIcon(.settings)
                         }
                         Spacer(minLength: 0)
@@ -331,6 +335,7 @@ struct DesktopView: View {
                 case .calculator: calculatorContent
                 case .calendar: calendarContent
                 case .clock: clockContent
+                case .paint: PaintView()
                 case .settings: settingsContent
                 case .about: aboutContent
                 }
