@@ -2,6 +2,7 @@ import SwiftUI
 
 private enum OSApp: String, CaseIterable, Identifiable {
     case files = "Files"
+    case terminal = "Terminal"
     case notes = "Notepad"
     case calculator = "Calculator"
     case calendar = "Calendar"
@@ -14,6 +15,7 @@ private enum OSApp: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .files: return "folder.fill"
+        case .terminal: return "terminal.fill"
         case .notes: return "note.text"
         case .calculator: return "calculator.fill"
         case .calendar: return "calendar"
@@ -26,6 +28,7 @@ private enum OSApp: String, CaseIterable, Identifiable {
     var tint: Color {
         switch self {
         case .files: return .cyan
+        case .terminal: return .green
         case .notes: return .yellow
         case .calculator: return .orange
         case .calendar: return .pink
@@ -88,6 +91,7 @@ struct DesktopView: View {
                     HStack(alignment: .top, spacing: 14) {
                         VStack(alignment: .leading, spacing: 18) {
                             desktopIcon(.files)
+                            desktopIcon(.terminal)
                             desktopIcon(.notes)
                             desktopIcon(.calculator)
                             desktopIcon(.calendar)
@@ -331,6 +335,18 @@ struct DesktopView: View {
             Group {
                 switch app {
                 case .files: filesContent
+                case .terminal:
+                    TerminalView { requestedName in
+                        let normalized = requestedName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard let target = OSApp.allCases.first(where: { candidate in
+                            candidate.rawValue.localizedCaseInsensitiveCompare(normalized) == .orderedSame ||
+                            (candidate == .notes && normalized.localizedCaseInsensitiveCompare("notes") == .orderedSame) ||
+                            (candidate == .calculator && normalized.localizedCaseInsensitiveCompare("calc") == .orderedSame) ||
+                            (candidate == .about && normalized.localizedCaseInsensitiveCompare("about") == .orderedSame)
+                        }) else { return false }
+                        launch(target)
+                        return true
+                    }
                 case .notes: notesContent
                 case .calculator: calculatorContent
                 case .calendar: calendarContent
